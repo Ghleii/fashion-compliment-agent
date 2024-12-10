@@ -11,56 +11,6 @@ import captions from '../../assets/captions.json'
 
 const streamPipeline = promisify(pipeline)
 
-import { createBlob } from '@vercel/blob';
-
-const generateImagesWithDalle = async (args, lang = 0) => {
-    const image_items = args.items;
-
-    let image_result = await Promise.all(
-        Array.from(image_items).map(async (img) => {
-            const image_prompt = img.prompt;
-            const image_size = img.size;
-            const image_quality = img.quality;
-
-            try {
-                const dalle_image = await imageCompletion({
-                    prompt: image_prompt,
-                    quality: image_quality,
-                    size: image_size,
-                });
-
-                const data_response = await fetch(dalle_image.data[0].url);
-
-                const blobResult = await createBlob({
-                    data: data_response.body,
-                    contentType: 'image/png',
-                    access: 'public',
-                });
-
-                // 修正: return はこの関数内に配置
-                return {
-                    url: blobResult.url,
-                    alt: `${img.prompt}`,
-                };
-
-            } catch (error) {
-                console.error(error.name, error.message);
-                return null;
-            }
-        })
-    );
-
-    return image_result.length > 0
-        ? {
-            status: 'image generated',
-            images: image_result,
-        }
-        : {
-            status: 'error',
-            message: 'There is a problem creating your image',
-        };
-};
-
 function base64_encode(file) {
     try {
         
@@ -190,28 +140,21 @@ const useDalle = async (args, lang = 0) => {
             const parts = pathname.split('/')
             const name = parts[parts.length - 1]
 
-            const filename = `tmp-${Date.now()}-${name}`
-            let filepath = path.join('public', 'uploads', filename)
-
-            const data_response = await fetch(img.url)
-
-            console.log(img.url)
-
             try {
+                const blobResult = await createBlob({
+                    data: data_response.body,
+                    contentType: 'image/png', // 必要に応じて正しいMIMEタイプを設定
+                    access: 'public', // 公開アクセスを許可する場合
+                });
 
-                await streamPipeline(data_response.body, fs.createWriteStream(filepath))
-
-                return {
-                    url: `/uploads/${filename}`,
-                    alt: `${img.prompt}`
-                }
-
-            } catch(error) {
-
-                console.log(name, error)
-
-                return null
-
+            return {
+                url: blobResult.url, // Vercel BlobのURL
+                alt: `${img.prompt}`,
+            };
+            
+            } catch (error) {
+                console.error(error.name, error.message);
+                return null;
             }
 
         })
