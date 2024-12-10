@@ -11,6 +11,19 @@ import captions from '../../assets/captions.json'
 
 const streamPipeline = promisify(pipeline)
 
+import { createBlob } from '@vercel/blob';
+
+const blobResult = await createBlob({
+    data: data_response.body, // fetchから取得した画像データ
+    contentType: 'image/png', // 必要に応じて変更
+    access: 'public', // 公開設定（'private'も可能）
+});
+
+return {
+    url: blobResult.url, // Vercel Blobが生成した公開URL
+    alt: `${img.prompt}`,
+};
+
 function base64_encode(file) {
     try {
         
