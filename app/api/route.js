@@ -13,15 +13,52 @@ const streamPipeline = promisify(pipeline)
 
 import { createBlob } from '@vercel/blob';
 
-const blobResult = await createBlob({
-    data: data_response.body, // fetchから取得した画像データ
-    contentType: 'image/png', // 必要に応じて変更
-    access: 'public', // 公開設定（'private'も可能）
-});
+const generateImagesWithDalle = async (args, lang = 0) => {
+    const image_items = args.items;
 
-return {
-    url: blobResult.url, // Vercel Blobが生成した公開URL
-    alt: `${img.prompt}`,
+    let image_result = await Promise.all(
+        Array.from(image_items).map(async (img) => {
+            const image_prompt = img.prompt;
+            const image_size = img.size;
+            const image_quality = img.quality;
+
+            try {
+                const dalle_image = await imageCompletion({
+                    prompt: image_prompt,
+                    quality: image_quality,
+                    size: image_size,
+                });
+
+                const data_response = await fetch(dalle_image.data[0].url);
+
+                const blobResult = await createBlob({
+                    data: data_response.body,
+                    contentType: 'image/png',
+                    access: 'public',
+                });
+
+                // 修正: return はこの関数内に配置
+                return {
+                    url: blobResult.url,
+                    alt: `${img.prompt}`,
+                };
+
+            } catch (error) {
+                console.error(error.name, error.message);
+                return null;
+            }
+        })
+    );
+
+    return image_result.length > 0
+        ? {
+            status: 'image generated',
+            images: image_result,
+        }
+        : {
+            status: 'error',
+            message: 'There is a problem creating your image',
+        };
 };
 
 function base64_encode(file) {
