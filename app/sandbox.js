@@ -258,59 +258,49 @@ export default function Sandbox() {
         fileRef.current.click()
     }
 
-    const handleFile = (e) => {
-
-        if(e.target.files.length === 0) return
-
-        setProcessing(true)
-
-        const file = e.target.files[0]
-        
-        const reader = new FileReader()
-
-        reader.onload = function() {
-            
-            const image = new Image()
-
-            image.onload = function() {
-
-                const newImage = {
-                    id: Date.now(),
-                    src: image.src, //
-                    file: file,
-                    _image: image, //
-                    base64: reader.result,
-                }
-
-                setPreviewImage((prevImgs) => [...prevImgs, ...[newImage]])
-
-                setProcessing(false)
-
+    const handleFileUpload = async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+    
+        try {
+            const response = await fetch(process.env.VERCEL_BLOB_API_URL, {
+                method: 'POST',
+                body: formData,
+            });
+    
+            if (!response.ok) {
+                throw new Error('Failed to upload file');
             }
-
-            image.onerror = function(error) {
-                
-                console.log('Load image', error)
-
-                setProcessing(false)
-
-            }
-
-            image.src = reader.result
-
+    
+            const result = await response.json();
+            return result.url; // アップロードされたファイルのURLを返す
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
         }
-
-        reader.onerror = function() {
-
-            console.log('Error reading file')
-
-            setProcessing(false)
-
+    };
+    
+    const handleFile = async (e) => {
+        if (e.target.files.length === 0) return;
+    
+        setProcessing(true);
+    
+        const file = e.target.files[0];
+        const fileUrl = await handleFileUpload(file);
+    
+        if (fileUrl) {
+            const newImage = {
+                id: Date.now(),
+                src: fileUrl,
+                file: file,
+                base64: fileUrl,
+            };
+    
+            setPreviewImage((prevImgs) => [...prevImgs, newImage]);
         }
-
-        reader.readAsDataURL(file)
-
-    }
+    
+        setProcessing(false);
+    };
 
     const handleDeleteMessage = (gid) => {
         

@@ -171,187 +171,154 @@ const useDalle = async (args, lang = 0) => {
 }
 
 export async function POST(request) {
-
-    const { lang = 0, inquiry, previous, image } = await request.json()
+    const { lang = 0, inquiry, previous, image } = await request.json();
 
     if (!inquiry || !Array.isArray(previous)) {
         return new Response('Bad request', {
             status: 400,
-        })
+        });
     }
 
-    let prev_data = trim_array(previous, 20)
-
-    let isImageExist = image && Array.isArray(image) && image.length > 0
+    let prev_data = trim_array(previous, 20);
+    let isImageExist = image && Array.isArray(image) && image.length > 0;
 
     const tools = [
         { type: 'function', function: create_image_dalle },
         { type: 'function', function: get_image_for_analysis },
-    ]
-    
-    let system_prompt = `You are a helpful assistant.\n`
-        
+    ];
+
+    let system_prompt = `You are a helpful assistant.\n`;
+
     let general_prompt = `When the user wants to know create an image, it means they want to create an image using DALL-E 3 and you will help them to write the prompt for DALL-E.\n` +
         `When creating prompt for image creation, do not make up your own prompt.\n` +
         `Ask the user their own ideas of what image they want to be.\n` +
-        `If the description is vague, clarify to the user some elements to make it clearer.` +
+        `If the description is vague, clarify to the user some elements to make it clearer.\n` +
         `Confirm to the user the image prompt before calling create_image_dall-e 3.\n` +
         `If possible, give them several variations of possible prompts.\n` +
         `When the user wants to analyse image data from chat history, call get_image_for_analysis function.\n` +
-        `Be sure to include all the details when filling the query parameter so that we can analyze the picture accurately based on user query.\n`
-    
-    let vision_prompt = `You are an expert in analysing images and you will help the user in their inquiries related to the images included.\n`
-    
-    let today = `Today is ${new Date()}.`
+        `Be sure to include all the details when filling the query parameter so that we can analyze the picture accurately based on user query.\n`;
 
-    system_prompt += isImageExist ? vision_prompt : general_prompt
-    system_prompt += today
+    let vision_prompt = `You are an expert in analysing images and you will help the user in their inquiries related to the images included.\n`;
 
-    let messages = [{ role: 'system', content: system_prompt }]
-    if(prev_data.length > 0) {
-        messages = messages.concat(prev_data)
+    let today = `Today is ${new Date()}.`;
+
+    system_prompt += isImageExist ? vision_prompt : general_prompt;
+    system_prompt += today;
+
+    let messages = [{ role: 'system', content: system_prompt }];
+    if (prev_data.length > 0) {
+        messages = messages.concat(prev_data);
     }
 
-    if(isImageExist) {
-
-        let user_content = [{ type: 'text', text: inquiry }]
+    if (isImageExist) {
+        let user_content = [{ type: 'text', text: inquiry }];
 
         image.forEach((img) => {
-            user_content.push({ type: 'image_url', image_url: { url: img.base64 } })
-        })
+            user_content.push({ type: 'image_url', image_url: { url: img.base64 } });
+        });
 
-        messages.push({ role: 'user', content: user_content })
-
+        messages.push({ role: 'user', content: user_content });
     } else {
-        messages.push({ role: 'user', content: inquiry })
+        messages.push({ role: 'user', content: inquiry });
     }
 
-    let result = {}
+    let result = {};
 
     try {
+        let options = { messages };
 
-        let options = { messages }
-
-        if(isImageExist) {
-            options.model = 'gpt-4o'
+        if (isImageExist) {
+            options.model = 'gpt-4o';
         } else {
-            options.tools = tools
+            options.tools = tools;
         }
-        
-        result = await chatCompletion(options)
 
-        console.log('function call', result)
-        
-    } catch(error) {
+        result = await chatCompletion(options);
 
-        console.log(error.name, error.message)
-
+        console.log('function call', result);
+    } catch (error) {
+        console.log(error.name, error.message);
     }
 
-    if(result.finish_reason === 'tool_calls') {
+    if (result.finish_reason === 'tool_calls') {
+        let tool_response = result.message;
+        let tool_outputs = [];
+        let tool_images = [];
 
-        let tool_response = result.message
-        let tool_outputs = []
-        let tool_images = []
+        for (let tool of tool_response.tool_calls) {
+            let tool_name = tool.function.name;
+            let tool_args = JSON.parse(tool.function.arguments);
 
-        for(let tool of tool_response.tool_calls) {
+            console.log(tool_name, tool_args);
 
-            let tool_name = tool.function.name
-            let tool_args = JSON.parse(tool.function.arguments)
+            let tool_output_item = { status: 'error', message: 'sorry, function not found' };
 
-            console.log(tool_name, tool_args)
+            if (tool_name === 'create_image_dall-e') {
+                tool_output_item = await useDalle(tool_args);
 
-            let tool_output_item = { status: 'error', message: 'sorry, function not found' }
+                if (!tool_output_item.error) {
+                    let { images, ...others } = tool_output_item;
 
-            if(tool_name === 'create_image_dall-e') {
-
-                tool_output_item = await useDalle(tool_args)
-
-                if(!tool_output_item.error) {
-
-                    // we are separating the image data
-                    // we will not include it when we submit the response back for summary
-                    let { images, ...others } = tool_output_item
-
-                    tool_images = images
-                    tool_output_item = others
-
+                    tool_images = images;
+                    tool_output_item = others;
                 }
-
-            } else if(tool_name === 'get_image_for_analysis') {
-
-                tool_output_item = await useVision(tool_args, inquiry, prev_data)
-
+            } else if (tool_name === 'get_image_for_analysis') {
+                tool_output_item = await useVision(tool_args, inquiry, prev_data);
             }
 
-            console.log(tool_output_item)
+            console.log(tool_output_item);
 
             tool_outputs.push({
-                tool_call_id: tool.id, 
-                role: 'tool', 
+                tool_call_id: tool.id,
+                role: 'tool',
                 name: tool_name,
-                content: JSON.stringify(tool_output_item, null, 2) 
-            })
-
+                content: JSON.stringify(tool_output_item, null, 2),
+            });
         }
 
-        messages.push(tool_response)
-        for(let output_item of tool_outputs) {
-            messages.push(output_item)
+        messages.push(tool_response);
+
+        for (let output_item of tool_outputs) {
+            messages.push(output_item);
         }
 
         try {
-
             result = await chatCompletion({
                 messages,
-                tools
-            })
+                tools,
+            });
 
-            console.log('summary', result)
-            console.log("images", tool_images)
+            console.log('summary', result);
+            console.log('images', tool_images);
 
-            if(tool_images.length > 0) {
-                result.message.image = tool_images
+            if (tool_images.length > 0) {
+                result.message.image = tool_images;
             }
-
-        } catch(error) {
-            
-            console.log(error.name, error.message)
-
+        } catch (error) {
+            console.log(error.name, error.message);
         }
-        
     } else {
-
-        // in case the AI respond with markdown image
-        // we will extract the image urls
-
-        let tmp_content = result.message.content.split('\n')
+        let tmp_content = result.message.content.split('\n');
 
         let tmp_images = tmp_content.filter((tmp) => {
-            return tmp.indexOf('![') >= 0
+            return tmp.indexOf('![') >= 0;
         }).map((tmp) => {
-            
-            const tmp_data = parse_markdown_image_link(tmp)
-            
+            const tmp_data = parse_markdown_image_link(tmp);
+
             return {
                 alt: tmp_data[0],
-                url: tmp_data[1].split(' ')[0]
-            }
+                url: tmp_data[1].split(' ')[0],
+            };
+        });
 
-        })
-
-        if(tmp_images.length > 0) {
-            
-            result.message.image = tmp_images
-
+        if (tmp_images.length > 0) {
+            result.message.image = tmp_images;
         }
-
     }
 
     return new Response(JSON.stringify({
         result: result.message,
     }), {
         status: 200,
-    })
-
+    });
 }
