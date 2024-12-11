@@ -8,6 +8,7 @@ import create_image_dalle from '../../assets/create_image_dall-e.json'
 import get_image_for_analysis from '../../assets/get_image_for_analysis.json'
 //import get_image_info from '../../assets/get_image_info.json'
 import captions from '../../assets/captions.json'
+import { createBlob } from '@vercel/blob';
 
 const streamPipeline = promisify(pipeline)
 
