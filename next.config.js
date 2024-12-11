@@ -7,6 +7,21 @@ const nextConfig = {
     })
     return config
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "hoyw5roiqu7mak0o.public.blob.vercel-storage.com",
+      },
+    ],
+  },
+    experimental: {
+      serverActions: {
+        bodySizeLimit: "45mb",
+      },
+    },
+  };
+  
   env: {
     siteTitle: '服装コンプリメントエージェント',
     maxFileUploadCount: 10,
