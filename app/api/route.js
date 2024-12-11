@@ -141,7 +141,6 @@ const useDalle = async (args, lang = 0) => {
             const parts = pathname.split('/')
             const name = parts[parts.length - 1]
             
-
             try {
                 const blobResult = await put(imageFile.name, imageFile, ({
                     data: data_response.body,
