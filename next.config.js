@@ -16,6 +16,15 @@ const nextConfig = {
   experimental: {
     appDir: true,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'my-blob-store.public.blob.vercel-storage.com',
+        port: '',
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;
