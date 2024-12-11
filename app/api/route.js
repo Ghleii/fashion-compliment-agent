@@ -140,13 +140,13 @@ const useDalle = async (args, lang = 0) => {
             const pathname = urlObject.pathname
             const parts = pathname.split('/')
             const name = parts[parts.length - 1]
-
+            
             try {
-                const blobResult = await createBlob({
+                const blobResult = await put(imageFile.name, imageFile, ({
                     data: data_response.body,
                     contentType: 'image/png', // 必要に応じて正しいMIMEタイプを設定
                     access: 'public', // 公開アクセスを許可する場合
-                });
+                }));
 
             return {
                 url: blobResult.url, // Vercel BlobのURL
